@@ -1,7 +1,5 @@
 pacman::p_load(shiny, shinyjs, shinydashboard, shinydashboardPlus, shinyWidgets, shinyBS, dplyr, stringr, lubridate, RSQLite, DT)
 
-?progressBar
-
 ## =============================================================================
 ## This runs once to create the database
 ## =============================================================================
@@ -23,38 +21,49 @@ if (length(tbs) == 0) {
             ,amount FLOAT NOT NULL
         );"
 
-    query_cat <- "CREATE
-    TABLE
-        cat (
-            title TEXT NOT NULL
-            ,category2 VARCHAR (255)
-            ,tags VARCHAR (255)
-            ,PRIMARY KEY (title)
-        );"
+    # query_cat <- "CREATE
+    # TABLE
+    #     cat (
+    #         title TEXT NOT NULL
+    #         ,category2 VARCHAR (255)
+    #         ,tags VARCHAR (255)
+    #         ,PRIMARY KEY (title)
+    #     );"
     
     out <- dbSendQuery(con, query_nu)
     dbClearResult(out)
     
-    out <- dbSendQuery(con, query_cat)
-    dbClearResult(out)
-    
+    # out <- dbSendQuery(con, query_cat)
+    # dbClearResult(out)
 }
 dbDisconnect(con)
 
 ## =============================================================================
-## Nubank functions
+## Funções Nubank
 ## =============================================================================
-
-readNu <- function(type = "nu") {
+# query
+# 1: NOMRAL
+# 2: CLASSIFICA
+# 3: ARQUIVOS JA AMRAZENADOS
+# 4: Tras as categorias
+readNu <- function(query = 1) {
     con <- dbConnect(RSQLite::SQLite(),  "www/Nubank.db")
-    
-    x <- dbListTables(con)
 
-    x <- switch(type,
-                "nu" = dbReadTable(con, "nu"),
-                "cat" = dbReadTable(con, "cat"),
-                "Please enter one of the three options: nu or cat"
-                )
+    query <- switch(query,
+           "1" =  NULL, 
+           "2" = "SELECT title, category, ymd, tot_par, par, amount FROM nu WHERE category2 IS NULL;", 
+           "3" = "SELECT DISTINCT ym_file FROM nu;",
+           "4" = "SELECT title, category2, tags FROM nu WHERE category2 IS NOT NULL;"
+           )
+
+    if (is.null(query)) {
+        x <-  dbReadTable(con, "nu")
+    } else {
+        out <- dbSendQuery(con, query)
+        x <- fetch(out, n = -1)
+        invisible(dbHasCompleted(out))
+        dbClearResult(out)
+    }
 
     dbDisconnect(con)
     return(x)
@@ -88,10 +97,12 @@ writeNu <- function(x, type = "nu") {
     return(x)
 }
 
-FaturasAdded <- function() {
+
+
+FaturasAdicionadas <- function() {
     con <- dbConnect(RSQLite::SQLite(),  "www/Nubank.db")
 
-    out <- dbSendQuery(con, "SELECT DISTINCT ym_file FROM nu;")
+    out <- dbSendQuery(con, )
     data <- fetch(out, n = -1)
     invisible(dbHasCompleted(out))
     dbClearResult(out)
@@ -101,11 +112,11 @@ FaturasAdded <- function() {
 
 
 ## =============================================================================
-## Modules
+## Modulos
 ## =============================================================================
 
 ## =============================================================================
-## Extra functions
+## Funções extras
 ## =============================================================================
 
 

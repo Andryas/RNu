@@ -25,7 +25,12 @@ shinyUI(
                 ## =============================================================
                 ## Classifica
                 ## =============================================================
-                
+                actionBttn(
+                    inputId = "nu_classifica",
+                    label = "Classifica", 
+                    style = "minimal",
+                    color = "royal"
+                ),
                 # fluidRow(align = "left", 
                 #          shinyjs::hidden(
                 #                       div(
@@ -44,23 +49,18 @@ shinyUI(
                 #          ))
 
                 ## =============================================================
-                ## History
+                ## Historico
                 ## =============================================================
                 actionBttn(
-                    inputId = "in_nu_history",
+                    inputId = "nu_historico",
                     label = "Meus dados", 
                     style = "minimal",
                     color = "royal"
-                ),
+                )
                 
-                bsModal("history_modal", "Meus dados", "in_nu_history", size = "large", 
-                        tabBox(width = 12, 
-                               tabPanel("Histórico", dataTableOutput("history_tb")),
-                               tabPanel("Classificação", dataTableOutput("classify_tb"))
-                        ))
             )
             
-            ),
+        ),
         column(2)
     )
 )
