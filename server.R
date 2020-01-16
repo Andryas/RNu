@@ -28,6 +28,8 @@ shinyServer(function(input, output, session) {
     observeEvent(input$nu_add_close, {
         shinyjs::reset("nu_file")
         shinyjs::show("nu_file")
+
+        ## TODO put a javascript here...
         shinyjs::hide("fatura_adicionada")
         shinyjs::hide("fatura_adicionada2")
         shinyjs::hide("file_nome_invalido")
@@ -39,9 +41,9 @@ shinyServer(function(input, output, session) {
     observe({
         req(input$nu_file)
 
-        cat <- readNu("cat")
+        cat <- readNu(4)
 
-        ym_file <- readNu(3) %>% pull(ym_file)
+        ym_file <- readNu(3)
         
         shinyjs::hide("nu_file")
         
@@ -49,21 +51,26 @@ shinyServer(function(input, output, session) {
 
         ## Verifica se o arquivo é válido
         x <- try(read.csv(inFile$datapath), silent = TRUE)
+        
         if ("try-error" %in% class(x)) {
             file_ <- TRUE 
         } else {
             file_ <- !all(c("date", "category", "title", "amount") %in% names(x))
         }
-        
-        if (length(ym_file) > 0 && str_extract(inFile$name, "[0-9]{4}-[0-9]{2}") %in% ym_file) {
-            shinyjs::show("fatura_adicionada")
-        } else if (str_detect(inFile$name,"20(1|2)[0-9]{1}-((0[1-9]{1})|(1[012]){1})", TRUE)) {
-            shinyjs::show("file_nome_invalido")
-        } else if (file_) {
+
+        if (file_) {
+            ## Se der erro na leitura...
             shinyjs::show("file_invalido")
+        } else if (str_detect(inFile$name,"20(1|2)[0-9]{1}-((0[1-9]{1})|(1[012]){1})", TRUE)) {
+            ## Se o nome do arquivo estiver escrito errado...
+            shinyjs::show("file_nome_invalido")
+        } else if (nrow(ym_file) > 0 && (str_extract(inFile$name, "[0-9]{4}-[0-9]{2}") %in% ym_file$ym_file &
+                                         nrow(read.csv(inFile$datapath)) == filter(ym_file, ym_file == str_extract(inFile$name, "[0-9]{4}-[0-9]{2}")) %>% pull(n))) {
+            ## Se a data do arquivo for igual a da base e tiver a mesma quantidade de linhas... fatura ja add
+            shinyjs::show("fatura_adicionada")
         } else {
             shinyjs::show("nu_file_barra_progresso")
-            
+
             x <- read.csv(inFile$datapath, stringsAsFactors = FALSE) %>%
                 mutate(
                     tot_par = str_extract(title, "(?<=/)[0-9]{1,2}"), 
@@ -92,13 +99,10 @@ shinyServer(function(input, output, session) {
                     value = i, total = nrow(x),
                     title = ""
                 )
-                Sys.sleep(0.1)
             }
             
             ## Update tabela nu com novas informações
-            x %>%
-                writeNu(type = "nu") %>%
-                invisible()
+            writeNu(x, type = "nu")
 
             shinyjs::enable("nu_add_close")
             shinyjs::hide("nu_file_barra_progresso")
@@ -109,116 +113,65 @@ shinyServer(function(input, output, session) {
     ## =========================================================================
     ## Classifica
     ## =========================================================================
-    observeEvent(input$nu_classifica, {
+    observeEvent(input$nu_classifica,  {
         aux$class <- readNu(2)
         aux$cat <- readNu(4)
-    }, priority = 10)
-
-    observeEvent(input$nu_classifica, {
         if (nrow(aux$class) > 0) {
-            showModal(modalDialog(
-                title =  span(style = "color: #bd2df5;", "Classificação"),
-                footer = actionBttn("nu_classifica_close", "Fechar", style = "minimal", color = "royal"),
-                size = "l",
-                fluidPage(
-                    fluidRow(
-                        column(9, h3(style = "color:black;", "Nome da Compra: ", span(style = "color: #bd2df5;", aux$class[1, ]$title))), 
-                        column(3, align = "right", h3(style = "color:black;", "Valor: ", span(style = "color: #bd2df5", aux$class[1, ]$amount)))
-                    ),
-                    
-                    fluidRow(
-                        column(5, h4(style = "color:black;", "Categoria Nubank: ", span(style = "color: #bd2df5", aux$class[1, ]$category))),
-                        column(2, align = "center", h4(style = "color: black;", "Parcela: ",
-                                                       span(style = "color: #bd2df5", ifelse(is.na(aux$class[1, ]$tot_par), "NA", paste0(aux$class[1, ]$par, "/", aux$class[1, ]$tot_par))))), 
-                        column(5, align = "right", h4(style = "color:black;", "Data da compra: ", span(style = "color: #bd2df5", aux$class[1, ]$ymd)))
-                    ),
-                    hr(), 
-                    
-                    fluidRow(
-                        column(4,
-                               
-                               selectizeInput(
-                                   inputId = "add_category",
-                                   label = "Categoria", 
-                                   choices = unique(aux$cat$category2),
-                                   options = list(
-                                       create = TRUE
-                                   )
-                               )
-                               
-                               ),
-                        column(8,
-                               
-                               selectizeInput(
-                                   inputId = "add_tags",
-                                   label = "Tags", 
-                                   choices = unique(do.call(c,strsplit(aux$cat$tags,","))),
-                                   width = "95%",
-                                   selected = "", 
-                                   multiple = TRUE, 
-                                   options = list(
-                                       create = TRUE
-                                   )
-                               )
-                               
-                               )
-                    )
-                )
-            ))
+            output$ui_classifica <- renderUI({updateUiClassifica(aux$class[1, ], aux$cat)})
         } else {
-            showModal(modalDialog(
-                title = "Sem itens para classificar",
-                footer = NULL,
-                size = "s",
-                easyClose = TRUE
-            ))
+            output$ui_classifica <- renderUI({
+                fluidPage(
+                    column(12, align = "center", h3(style = "color:black;", "Você já classificou todas suas desespesas!"))
+                )
+            })
         }
-        
-        
+    }, priority = 10)
+    
+    observeEvent(input$nu_classifica, {
+        showModal(modalDialog(
+            title =  span(style = "color: #bd2df5;", "Classificação"),
+            footer = actionBttn("nu_classifica_close", "Fechar", style = "minimal", color = "royal"),
+            size = "l",
+            uiOutput("ui_classifica")
+        ))
     }, priority = 0)
 
-    observeEvent(input$classifica, {
-        ## Att banco de dados
+    observeEvent(input$nu_classifica_item, {
+        class_new <- aux$class[1, ]
+        class_new$category2 <- input$add_category
+        class_new$tags <- paste0(input$add_tags, collapse = ",")
+
+        aux$class <- aux$class %>%
+            select(-category2, -tags) %>% 
+            left_join(class_new %>% select(title, category2, tags), by = "title")
+
+        aux$class %>%
+            filter(!is.na(category2)) %>%
+            writeNu(type = "nu")
+
+        aux$class <- aux$class %>%
+            filter(is.na(category2))
+
+        aux$cat <- readNu(4)
+
+        if (nrow(aux$class) > 0) {
+            output$ui_classifica <- renderUI({
+                updateUiClassifica(aux$class[1, ], aux$cat)
+            })
+        } else {
+            output$ui_classifica <- renderUI({
+                fluidPage(
+                    column(12, align = "center", h3(style = "color:black;", "Você classificou todas suas desespesas!"))
+                )
+            })
+        }
     })
+    
 
     observeEvent(input$nu_classifica_close,  {
-        aux$cat <- NULL
         removeModal()
     })
     
-    # observeEvent(input$nexti, {
-    #     new_cat <- tibble(title = aux$new_nu[1, ]$title,
-    #                       category2 = ifelse(is.null(input$add_category), NA, input$add_category),
-    #                       tags = ifelse(is.null(input$add_tags), NA, paste0(input$add_tags, collapse = ","))) %>%
-    #         mutate(category2 = tolower(category2),
-    #                tags = tolower(tags))
-    # 
-    #     ## add na base dados
-    #     writeNu(new_cat, type = "cat")
-    # 
-    #     ## Junta com o já carregado
-    #     aux$cat <- aux$cat %>%
-    #         bind_rows(new_cat)
-    # 
-    #     ## classifica todas as compras iguais
-    #     ## Todos estão desclassificados aqui...
-    #     aux$new_nu <- aux$new_nu %>%
-    #         select(-category2, -tags) %>% 
-    #         left_join(new_cat, by = "title")
-    # 
-    #     ## Apenda novas informações
-    #     aux$new_nu %>%
-    #         filter(!is.na(category2)) %>% 
-    #         writeNu(x = ., type = "nu") 
-    # 
-    #     ## Sem categoria
-    #     aux$new_nu <- aux$new_nu %>%
-    #         filter(is.na(category2))
-    # 
-    # 
-    # })
-    
-
     ## =========================================================================
     ## Historico
     ## =========================================================================
@@ -240,13 +193,13 @@ shinyServer(function(input, output, session) {
     })
     
     output$history_tb <- renderDT({
-        input$nu_history
+        input$nu_historico
         x <- readNu(1)
         datatable(x)
     })
 
     output$classifica_tb <- renderDT({
-        input$nu_history
+        input$nu_historico
         x <- readNu(4)
         datatable(x)
     })

@@ -31,22 +31,6 @@ shinyUI(
                     style = "minimal",
                     color = "royal"
                 ),
-                # fluidRow(align = "left", 
-                #          shinyjs::hidden(
-                #                       div(
-                #                           id = "new_data_div",
-                # 
-                #                           # progressBar("new_data", 0, display_pct = TRUE),
-                # 
-                #                           uiOutput("classify"),
-                # 
-                #                           fluidRow(
-                #                               align = "center", 
-                #                               actionButton("nexti", "", icon("thumbs-up"), width = "20%")
-                #                           )
-                #                       )
-                #                   )
-                #          ))
 
                 ## =============================================================
                 ## Historico

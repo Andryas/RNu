@@ -21,40 +21,23 @@ if (length(tbs) == 0) {
             ,amount FLOAT NOT NULL
         );"
 
-    # query_cat <- "CREATE
-    # TABLE
-    #     cat (
-    #         title TEXT NOT NULL
-    #         ,category2 VARCHAR (255)
-    #         ,tags VARCHAR (255)
-    #         ,PRIMARY KEY (title)
-    #     );"
-    
     out <- dbSendQuery(con, query_nu)
     dbClearResult(out)
-    
-    # out <- dbSendQuery(con, query_cat)
-    # dbClearResult(out)
 }
 dbDisconnect(con)
 
 ## =============================================================================
 ## Funções Nubank
 ## =============================================================================
-# query
-# 1: NOMRAL
-# 2: CLASSIFICA
-# 3: ARQUIVOS JA AMRAZENADOS
-# 4: Tras as categorias
 readNu <- function(query = 1) {
     con <- dbConnect(RSQLite::SQLite(),  "www/Nubank.db")
 
     query <- switch(query,
-           "1" =  NULL, 
-           "2" = "SELECT title, category, ymd, tot_par, par, amount FROM nu WHERE category2 IS NULL;", 
-           "3" = "SELECT DISTINCT ym_file FROM nu;",
-           "4" = "SELECT title, category2, tags FROM nu WHERE category2 IS NOT NULL;"
-           )
+                    "1" =  NULL, 
+                    "2" = "SELECT * FROM nu WHERE category2 IS NULL;", 
+                    "3" = "SELECT  ym_file, count(ym_file) as n FROM nu GROUP BY ym_file;",
+                    "4" = "SELECT DISTINCT title, category2, tags FROM nu WHERE category2 IS NOT NULL;"
+                    )
 
     if (is.null(query)) {
         x <-  dbReadTable(con, "nu")
@@ -74,15 +57,14 @@ writeNu <- function(x, type = "nu") {
 
     if (type == "nu") {
         x <- x %>%
-            mutate(ymd = as.character(ymd),
-                   ym = as.character(ym))
+            mutate(ymd = as.character(ymd), ym = as.character(ym))
     }
     
     x <- try(switch(type,
-                "nu" = dbWriteTable(con, "nu", x, row.names = FALSE, append = TRUE, overwrite = FALSE),
-                "cat" = dbWriteTable(con, "cat", x, row.names = FALSE, append = TRUE, overwrite = FALSE),
-                "Please enter one of the three options: nu or cat"
-                ), silent = TRUE)
+                    "nu" = dbWriteTable(con, "nu", x, row.names = FALSE, append = TRUE, overwrite = FALSE),
+                    "cat" = dbWriteTable(con, "cat", x, row.names = FALSE, append = TRUE, overwrite = FALSE),
+                    "Please enter one of the three options: nu or cat"
+                    ), silent = TRUE)
 
     if ("try-error" %in% class(x)) {
         dbDisconnect(con)
@@ -97,40 +79,59 @@ writeNu <- function(x, type = "nu") {
     return(x)
 }
 
-
-
-FaturasAdicionadas <- function() {
-    con <- dbConnect(RSQLite::SQLite(),  "www/Nubank.db")
-
-    out <- dbSendQuery(con, )
-    data <- fetch(out, n = -1)
-    invisible(dbHasCompleted(out))
-    dbClearResult(out)
-    dbDisconnect(con)
-    return(data$ym_file)
+updateUiClassifica <- function(class, cat) {
+    fluidPage(
+        fluidRow(
+            column(9, h3(style = "color:black;", "Nome da Compra: ", span(style = "color: #bd2df5;", class$title))), 
+            column(3, align = "right", h3(style = "color:black;", "Valor: ", span(style = "color: #bd2df5", class$amount)))
+        ),
+        
+        fluidRow(
+            column(5, h4(style = "color:black;", "Categoria Nubank: ", span(style = "color: #bd2df5", class$category))),
+            column(2, align = "center", h4(style = "color: black;", "Parcela: ",
+                                           span(style = "color: #bd2df5", ifelse(is.na(class$tot_par), "NA", paste0(class$par, "/", class$tot_par))))), 
+            column(5, align = "right", h4(style = "color:black;", "Data da compra: ", span(style = "color: #bd2df5", class$ymd)))
+        ),
+        hr(), 
+        
+        fluidRow(
+            column(4,
+                   
+                   selectizeInput(
+                       inputId = "add_category",
+                       label = "Categoria", 
+                       choices = unique(cat$category2),
+                       options = list(
+                           create = TRUE
+                       )
+                   )
+                   
+                   ),
+            column(8,
+                   
+                   selectizeInput(
+                       inputId = "add_tags",
+                       label = "Tags", 
+                       choices = unique(do.call(c,strsplit(cat$tags,","))),
+                       width = "95%",
+                       selected = "", 
+                       multiple = TRUE, 
+                       options = list(
+                           create = TRUE
+                       )
+                   )
+                   
+                   )
+        ),
+        fluidRow(
+            align = "center", 
+            actionBttn(
+                inputId = "nu_classifica_item",
+                label = "Classifica", 
+                style = "minimal",
+                color = "royal"
+            )
+        )
+    )
+    
 }
-
-
-## =============================================================================
-## Modulos
-## =============================================================================
-
-## =============================================================================
-## Funções extras
-## =============================================================================
-
-
-# x <- read.csv("www/nubank-2019-10.csv", stringsAsFactors = FALSE) %>%
-#     mutate(
-#         tot_par = str_extract(title, "(?<=/)[0-9]{1,2}"), 
-#         par = str_extract(title, "[0-9]{1,2}(?=/)"),
-#         date = ymd(date),
-#         ym = ymd(str_c(format(date, "%Y-%m"), "-01")),
-#         ym_file = str_extract("www/nubank-2019-10.csv", "[0-9]{4}-[0-9]{2}"), 
-#         title = trimws(str_replace(title, "[0-9]{1,2}/[0-9]{1,2}", ""))
-#     ) %>%
-#     rename(ymd = date)
-# x$category2 <- "teste"
-# x$tags <- "teste,teste2"
-# readNu()
-# writeNu(x)
