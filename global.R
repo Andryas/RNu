@@ -49,7 +49,7 @@ readNu <- function(query = 1) {
     query <- switch(
         query,
         "1" =  NULL,
-        "2" = "SELECT * FROM nu WHERE category2 IS NULL;",
+        "2" = "SELECT * FROM nu WHERE category2 IS NULL OR category2 = '';",
         "3" = "SELECT DISTINCT title, category2, tags FROM nu WHERE category2 IS NOT NULL;"
     )
 
@@ -92,7 +92,19 @@ writeNu <- function(x) {
     return(x)
 }
 
+updateNu <- function(title, category2, tags) {
+    con <- dbConnect(RSQLite::SQLite(),  "www/Nubank.db")
+
+    query <- paste0("UPDATE nu ",
+                    "SET category2 = '", category2, "', tags = '", tags, "' ",
+                    "WHERE title='", title, "'")
+    dbSendQuery(con, query)
+    dbDisconnect(con)
+}
+
 updateUIClassifica <- function(class, cat) {
+    cat$category2[is.na(cat$category2)] <- ""
+    cat$tags[is.na(cat$tags)] <- ""
     fluidPage(
         fluidRow(column(
             9, h3(
@@ -142,7 +154,12 @@ updateUIClassifica <- function(class, cat) {
                 inputId = "add_category",
                 label = "Categoria",
                 choices = unique(cat$category2),
-                options = list(create = TRUE)
+                selected = "",
+                options = list(
+                    create = TRUE,
+                    # placeholder = 'Please select an option below',
+                    onInitialize = I('function() { this.setValue(""); }')
+                    )
             )
 
         ),
@@ -156,7 +173,11 @@ updateUIClassifica <- function(class, cat) {
                 width = "95%",
                 selected = "",
                 multiple = TRUE,
-                options = list(create = TRUE)
+                options = list(
+                    create = TRUE,
+                    # placeholder = 'Please select an option below',
+                    onInitialize = I('function() { this.setValue(""); }')
+                    )
             )
 
         )),
@@ -172,3 +193,5 @@ updateUIClassifica <- function(class, cat) {
     )
 
 }
+
+

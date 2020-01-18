@@ -41,7 +41,6 @@ shinyUI(
                     style = "minimal",
                     color = "royal"
                 )
-
             )
 
         ),

@@ -1,5 +1,5 @@
 shinyServer(function(input, output, session) {
-    aux <- reactiveValues(class = NULL, cat = NULL)
+    aux <- reactiveValues(class = NULL, cat = NULL, class_mod = NULL)
 
     ## =========================================================================
     ## Add Nova Informação
@@ -157,7 +157,7 @@ shinyServer(function(input, output, session) {
     ## =========================================================================
     observeEvent(input$nu_classifica,  {
         aux$class <- readNu(2)
-        aux$cat <- readNu(4)
+        aux$cat <- readNu(3)
         if (nrow(aux$class) > 0) {
             output$ui_classifica <-
                 renderUI({
@@ -192,26 +192,17 @@ shinyServer(function(input, output, session) {
     }, priority = 0)
 
     observeEvent(input$nu_classifica_item, {
-        class_new <- aux$class[1,]
-        class_new$category2 <- input$add_category
-        class_new$tags <- paste0(input$add_tags, collapse = ",")
+        id <- aux$class[1,]$id
+        title <- aux$class[1,]$title
+        updateNu(title, input$add_category, paste0(input$add_tags, collapse = ","))
 
         aux$class <- aux$class %>%
-            select(-category2, -tags) %>%
-            left_join(class_new %>% select(title, category2, tags), by = "title")
-
-        aux$class %>%
-            filter(!is.na(category2)) %>%
-            writeNu(type = "nu")
-
-        aux$class <- aux$class %>%
-            filter(is.na(category2))
-
-        aux$cat <- readNu(4)
+            filter(id != !!id)
+        aux$cat <- readNu(3)
 
         if (nrow(aux$class) > 0) {
             output$ui_classifica <- renderUI({
-                updateUiClassifica(aux$class[1,], aux$cat)
+                updateUIClassifica(aux$class[1,], aux$cat)
             })
         } else {
             output$ui_classifica <- renderUI({
@@ -236,6 +227,7 @@ shinyServer(function(input, output, session) {
     ## Historico
     ## =========================================================================
     observeEvent(input$nu_historico, {
+        aux$class_mod <- readNu(3)
         showModal(
             modalDialog(
                 title = span(style = "color: #bd2df5;", "Meus Dados"),
@@ -255,14 +247,52 @@ shinyServer(function(input, output, session) {
     output$history_tb <- renderDT({
         input$nu_historico
         x <- readNu(1)
-        datatable(x)
+        datatable(x,
+                  filter = "top",
+                  escape = FALSE,
+                  class = "display",
+                  rownames = FALSE,
+                  options = list(
+                      searchHighlight = TRUE,
+                      dom = "tip",
+                      pageLength = 50,
+                      autoWidth = TRUE,
+                      scrollX = TRUE,
+                      columnDefs = list(
+                          list(width = "200px", targets = 4),
+                          list(width = "200px", targets = 7),
+                          list(
+                              targets = 0,
+                              render = JS(
+                                  "function(data, type, row, meta) {",
+                                  "return type === 'display' && data.length > 6 ?",
+                                  "'<span title=\"' + data + '\">' + data.substr(0, 6) + '...</span>' : data;",
+                                  "}")
+                          )
+                      )
+                  ),
+                  callback = JS('table.page(3).draw(false);')
+        )
     })
 
     output$classifica_tb <- renderDT({
         input$nu_historico
-        x <- readNu(4)
-        datatable(x)
+        datatable(aux$class_mod,
+                  filter = "top",
+                  escape = FALSE,
+                  class = "display",
+                  rownames = FALSE,
+                  options = list(
+                      searchHighlight = TRUE,
+                      dom = "tip",
+                      autoWidth = TRUE,
+                      columnDefs = list()
+                  ),
+                  editable = list(
+                      target = "row",
+                      disable = list(columns = 0)
+                  )
+                  )
     })
-
 
 })
