@@ -1,14 +1,14 @@
 shinyUI(
     fluidPage(
         tags$head(
-                 tags$link(rel = "stylesheet", type = "text/css", href = "styles.css")
-             ),
+            tags$link(rel = "stylesheet", type = "text/css", href = "styles.css")
+        ),
         useShinyjs(),
         useShinydashboardPlus(),
         column(2),
         column(
             8,
-            
+
             fluidRow(
                 align = "center",
 
@@ -17,7 +17,7 @@ shinyUI(
                 ## =============================================================
                 actionBttn(
                     inputId = "nu_add",
-                    label = "Add", 
+                    label = "Add",
                     style = "minimal",
                     color = "royal"
                 ),
@@ -27,7 +27,7 @@ shinyUI(
                 ## =============================================================
                 actionBttn(
                     inputId = "nu_classifica",
-                    label = "Classifica", 
+                    label = "Classifica",
                     style = "minimal",
                     color = "royal"
                 ),
@@ -37,15 +37,14 @@ shinyUI(
                 ## =============================================================
                 actionBttn(
                     inputId = "nu_historico",
-                    label = "Meus dados", 
+                    label = "Meus dados",
                     style = "minimal",
                     color = "royal"
                 )
-                
+
             )
-            
+
         ),
         column(2)
     )
 )
-

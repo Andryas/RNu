@@ -1,28 +1,59 @@
 shinyServer(function(input, output, session) {
-
     aux <- reactiveValues(class = NULL, cat = NULL)
-    
+
     ## =========================================================================
     ## Add Nova Informação
     ## =========================================================================
     observeEvent(input$nu_add, {
-
         showModal(modalDialog(
-            title = span(style = "color: #bd2df5;", "Nubank - Informações da fatura"),
-            size = "l", 
+            title = span(style = "color: #bd2df5;",
+                         "Nubank - Informações da fatura"),
+            size = "l",
             fluidRow(
-                align = "center", 
-                fileInput("nu_file", "Sua fatura do Nubank no formato .csv", accept = "csv", buttonLabel = "File", placeholder = "nubank-yyyy-mm.csv", width = "50%"),
-                shinyjs::hidden(progressBar("nu_file_barra_progresso", 0, display_pct = TRUE, striped = TRUE, unit_mark = "")),
-                shinyjs::hidden(div(id = "file_nome_invalido", h1("Nome do arquivo inválido!"))),
-                shinyjs::hidden(div(id = "file_invalido", h1("Este arquivo não parece uma fatura do Nubank."))),
-                shinyjs::hidden(div(id = "fatura_adicionada", h1("Essa fatura já foi adicionada!!"))),
-                shinyjs::hidden(div(id = "fatura_adicionada2", h1("Fatura adicionada com sucesso!!")))
+                align = "center",
+                fileInput(
+                    "nu_file",
+                    "Sua fatura do Nubank no formato .csv",
+                    accept = "csv",
+                    buttonLabel = "File",
+                    placeholder = "nubank-yyyy-mm.csv",
+                    width = "50%"
+                ),
+                shinyjs::hidden(
+                    progressBar(
+                        "nu_file_barra_progresso",
+                        0,
+                        display_pct = TRUE,
+                        striped = TRUE,
+                        unit_mark = ""
+                    )
+                ),
+                shinyjs::hidden(div(
+                    id = "file_nome_invalido",
+                    h1("Nome do arquivo inválido!")
+                )),
+                shinyjs::hidden(div(
+                    id = "file_invalido",
+                    h1("Este arquivo não parece uma fatura do Nubank.")
+                )),
+                shinyjs::hidden(div(
+                    id = "fatura_adicionada1",
+                    h1("Fatura já adicionada!!")
+                )),
+                shinyjs::hidden(div(
+                    id = "fatura_adicionada2",
+                    h1("Fatura adicionada com sucesso!!")
+                ))
             ),
-            footer = actionBttn("nu_add_close", "Fechar", style = "minimal", color = "royal")
-            
+            footer = actionBttn(
+                "nu_add_close",
+                "Fechar",
+                style = "minimal",
+                color = "royal"
+            )
+
         ))
-        
+
     })
 
     observeEvent(input$nu_add_close, {
@@ -34,26 +65,23 @@ shinyServer(function(input, output, session) {
         shinyjs::hide("fatura_adicionada2")
         shinyjs::hide("file_nome_invalido")
         shinyjs::hide("file_invalido")
-        
+
         removeModal()
     })
-    
+
     observe({
         req(input$nu_file)
 
-        cat <- readNu(4)
+        cat <- readNu(3)
 
-        ym_file <- readNu(3)
-        
         shinyjs::hide("nu_file")
-        
+
         inFile <- input$nu_file
 
         ## Verifica se o arquivo é válido
         x <- try(read.csv(inFile$datapath), silent = TRUE)
-        
         if ("try-error" %in% class(x)) {
-            file_ <- TRUE 
+            file_ <- TRUE
         } else {
             file_ <- !all(c("date", "category", "title", "amount") %in% names(x))
         }
@@ -61,26 +89,34 @@ shinyServer(function(input, output, session) {
         if (file_) {
             ## Se der erro na leitura...
             shinyjs::show("file_invalido")
-        } else if (str_detect(inFile$name,"20(1|2)[0-9]{1}-((0[1-9]{1})|(1[012]){1})", TRUE)) {
+        } else if (str_detect(inFile$name,
+                              "20(1|2)[0-9]{1}-((0[1-9]{1})|(1[012]){1})",
+                              TRUE)) {
             ## Se o nome do arquivo estiver escrito errado...
             shinyjs::show("file_nome_invalido")
-        } else if (nrow(ym_file) > 0 && (str_extract(inFile$name, "[0-9]{4}-[0-9]{2}") %in% ym_file$ym_file &
-                                         nrow(read.csv(inFile$datapath)) == filter(ym_file, ym_file == str_extract(inFile$name, "[0-9]{4}-[0-9]{2}")) %>% pull(n))) {
-            ## Se a data do arquivo for igual a da base e tiver a mesma quantidade de linhas... fatura ja add
-            shinyjs::show("fatura_adicionada")
         } else {
             shinyjs::show("nu_file_barra_progresso")
 
             x <- read.csv(inFile$datapath, stringsAsFactors = FALSE) %>%
                 mutate(
-                    tot_par = str_extract(title, "(?<=/)[0-9]{1,2}"), 
+                    tot_par = str_extract(title, "(?<=/)[0-9]{1,2}"),
                     par = str_extract(title, "[0-9]{1,2}(?=/)"),
                     date = ymd(date),
                     ym = ymd(str_c(format(date, "%Y-%m"), "-01")),
-                    ym_file = str_extract(inFile$name, "[0-9]{4}-[0-9]{2}"), 
+                    ym_file = str_extract(inFile$name, "[0-9]{4}-[0-9]{2}"),
                     title = trimws(str_replace(title, "[0-9]{1,2}/[0-9]{1,2}", ""))
                 ) %>%
-                rename(ymd = date)
+                rename(ymd = date) %>%
+                group_by_at(.vars = vars(-amount)) %>%
+                summarise(amount = sum(amount)) %>%
+                mutate(id = str_c(str_replace_all(ymd, "-", ""),
+                                  str_replace_all(tolower(title), " ", ""),
+                                  category,
+                                  ifelse(is.na(tot_par), "", "parcelado"),
+                                  collapse = ""),
+                       id = str_replace_all(id, "[[:punct:]]", "")
+                ) %>%
+                ungroup()
 
             ## Verifica quais observações já foram classificadas
             if (!is.null(cat)) {
@@ -96,17 +132,23 @@ shinyServer(function(input, output, session) {
                 updateProgressBar(
                     session = session,
                     id = "nu_file_barra_progresso",
-                    value = i, total = nrow(x),
+                    value = i,
+                    total = nrow(x),
                     title = ""
                 )
             }
-            
+
             ## Update tabela nu com novas informações
-            writeNu(x, type = "nu")
+            status <- writeNu(x)
+
 
             shinyjs::enable("nu_add_close")
             shinyjs::hide("nu_file_barra_progresso")
-            shinyjs::show("fatura_adicionada2")
+            if (status == 404) {
+                shinyjs::show("fatura_adicionada1")
+            } else {
+                shinyjs::show("fatura_adicionada2")
+            }
         }
     })
 
@@ -117,32 +159,45 @@ shinyServer(function(input, output, session) {
         aux$class <- readNu(2)
         aux$cat <- readNu(4)
         if (nrow(aux$class) > 0) {
-            output$ui_classifica <- renderUI({updateUiClassifica(aux$class[1, ], aux$cat)})
+            output$ui_classifica <-
+                renderUI({
+                    updateUIClassifica(aux$class[1,], aux$cat)
+                })
         } else {
             output$ui_classifica <- renderUI({
-                fluidPage(
-                    column(12, align = "center", h3(style = "color:black;", "Você já classificou todas suas desespesas!"))
-                )
+                fluidPage(column(
+                    12,
+                    align = "center",
+                    h3(
+                        style = "color:black;",
+                        "Você já classificou todas suas desespesas!"
+                    )
+                ))
             })
         }
     }, priority = 10)
-    
+
     observeEvent(input$nu_classifica, {
         showModal(modalDialog(
             title =  span(style = "color: #bd2df5;", "Classificação"),
-            footer = actionBttn("nu_classifica_close", "Fechar", style = "minimal", color = "royal"),
+            footer = actionBttn(
+                "nu_classifica_close",
+                "Fechar",
+                style = "minimal",
+                color = "royal"
+            ),
             size = "l",
             uiOutput("ui_classifica")
         ))
     }, priority = 0)
 
     observeEvent(input$nu_classifica_item, {
-        class_new <- aux$class[1, ]
+        class_new <- aux$class[1,]
         class_new$category2 <- input$add_category
         class_new$tags <- paste0(input$add_tags, collapse = ",")
 
         aux$class <- aux$class %>%
-            select(-category2, -tags) %>% 
+            select(-category2, -tags) %>%
             left_join(class_new %>% select(title, category2, tags), by = "title")
 
         aux$class %>%
@@ -156,42 +211,47 @@ shinyServer(function(input, output, session) {
 
         if (nrow(aux$class) > 0) {
             output$ui_classifica <- renderUI({
-                updateUiClassifica(aux$class[1, ], aux$cat)
+                updateUiClassifica(aux$class[1,], aux$cat)
             })
         } else {
             output$ui_classifica <- renderUI({
-                fluidPage(
-                    column(12, align = "center", h3(style = "color:black;", "Você classificou todas suas desespesas!"))
-                )
+                fluidPage(column(
+                    12,
+                    align = "center",
+                    h3(
+                        style = "color:black;",
+                        "Você classificou todas suas desespesas!"
+                    )
+                ))
             })
         }
     })
-    
+
 
     observeEvent(input$nu_classifica_close,  {
         removeModal()
     })
-    
+
     ## =========================================================================
     ## Historico
     ## =========================================================================
     observeEvent(input$nu_historico, {
-        showModal(modalDialog(
-            title = span(style = "color: #bd2df5;", "Meus Dados"),
-            size = "l",
-            easyClose = TRUE,
-            footer = NULL,
-            fluidPage(
-                tabBox(
-                    width = 12, 
-                    tabPanel("Histórico", dataTableOutput("history_tb")), 
+        showModal(
+            modalDialog(
+                title = span(style = "color: #bd2df5;", "Meus Dados"),
+                size = "l",
+                easyClose = TRUE,
+                footer = NULL,
+                fluidPage(tabBox(
+                    width = 12,
+                    tabPanel("Histórico", dataTableOutput("history_tb")),
                     tabPanel("Classificação", dataTableOutput("classifica_tb"))
-                )
+                ))
+
             )
-            
-        ))
+        )
     })
-    
+
     output$history_tb <- renderDT({
         input$nu_historico
         x <- readNu(1)
@@ -203,6 +263,6 @@ shinyServer(function(input, output, session) {
         x <- readNu(4)
         datatable(x)
     })
-    
-    
+
+
 })
